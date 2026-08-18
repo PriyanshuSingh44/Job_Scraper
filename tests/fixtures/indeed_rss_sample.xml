@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+  <title>Indeed Software Engineer Remote Jobs</title>
+  <link>https://rss.indeed.com/rss?q=software+engineer&amp;l=remote</link>
+  <description>Jobs from Indeed</description>
+  <item>
+    <title>Senior Full Stack Developer - TechCorp</title>
+    <link>https://www.indeed.com/viewjob?jk=123456789</link>
+    <description>Looking for a Python and React expert.</description>
+    <pubDate>Mon, 18 Aug 2026 12:00:00 GMT</pubDate>
+    <author>TechCorp Solutions</author>
+  </item>
+  <item>
+    <title>DevOps Specialist - CloudSystems</title>
+    <link>https://www.indeed.com/viewjob?jk=987654321</link>
+    <description>Kubernetes and Terraform experience required.</description>
+    <pubDate>Sun, 17 Aug 2026 15:30:00 GMT</pubDate>
+    <author>CloudSystems Ltd</author>
+  </item>
+</channel>
+</rss>

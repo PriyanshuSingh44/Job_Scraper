@@ -1,23 +1,21 @@
 import logging
 from typing import Optional, List, Tuple
-from app.schemas import JobCreate
 
 logger = logging.getLogger(__name__)
 
-# Required fields that must be non-empty for a record to be accepted
-REQUIRED_FIELDS_REMOTIVE = {"title", "url", "company_name"}
-REQUIRED_FIELDS_ARBEITNOW = {"title", "url", "company_name"}
+# Required fields that must be present and non-empty
+REQUIRED_FIELDS_WWR = {"title", "url", "company_name"}
+REQUIRED_FIELDS_INDEED_RSS = {"title", "url", "company_name"}
 
 
-def validate_remotive_record(raw: dict) -> Tuple[bool, Optional[str]]:
+def validate_wwr_record(raw: dict) -> Tuple[bool, Optional[str]]:
     """
-    Validate a raw Remotive record.
+    Validate a raw WeWorkRemotely parsed record.
     Returns (is_valid, error_reason).
-    Detects schema drift if expected keys are missing.
     """
-    missing = REQUIRED_FIELDS_REMOTIVE - set(raw.keys())
+    missing = REQUIRED_FIELDS_WWR - set(raw.keys())
     if missing:
-        return False, f"schema_drift: missing keys {missing}"
+        return False, f"markup_drift: missing required parsed keys {missing}"
 
     if not raw.get("title", "").strip():
         return False, "empty_title"
@@ -29,14 +27,14 @@ def validate_remotive_record(raw: dict) -> Tuple[bool, Optional[str]]:
     return True, None
 
 
-def validate_arbeitnow_record(raw: dict) -> Tuple[bool, Optional[str]]:
+def validate_indeed_rss_record(raw: dict) -> Tuple[bool, Optional[str]]:
     """
-    Validate a raw Arbeitnow record.
+    Validate a raw Indeed RSS parsed record.
     Returns (is_valid, error_reason).
     """
-    missing = REQUIRED_FIELDS_ARBEITNOW - set(raw.keys())
+    missing = REQUIRED_FIELDS_INDEED_RSS - set(raw.keys())
     if missing:
-        return False, f"schema_drift: missing keys {missing}"
+        return False, f"markup_drift: missing required parsed keys {missing}"
 
     if not raw.get("title", "").strip():
         return False, "empty_title"
@@ -54,9 +52,9 @@ def validate_and_filter(
     """
     Validate all records for a given source.
     Returns (valid_records, drift_count, drift_reasons).
-    Logs each invalid record individually — doesn't crash the pipeline.
+    Logs each invalid record individually — pipeline does not crash on individual bad rows.
     """
-    validator = validate_remotive_record if source == "remotive" else validate_arbeitnow_record
+    validator = validate_wwr_record if source == "weworkremotely" else validate_indeed_rss_record
     valid, drift_count, reasons = [], 0, []
 
     for i, rec in enumerate(records):
@@ -69,6 +67,6 @@ def validate_and_filter(
             logger.warning(f"[{source}] Record #{i} rejected — {reason}: {rec.get('title','<no title>')!r}")
 
     if drift_count:
-        logger.warning(f"[{source}] {drift_count}/{len(records)} records had validation issues.")
+        logger.warning(f"[{source}] {drift_count}/{len(records)} records had validation or markup issues.")
 
     return valid, drift_count, reasons

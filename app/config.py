@@ -1,16 +1,18 @@
-from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_url: str = Field(default="sqlite:///./jobs.db", env="DATABASE_URL")
-    ingest_interval_minutes: int = Field(default=30, env="INGEST_INTERVAL_MINUTES")
-    max_failures_before_fallback: int = Field(default=3, env="MAX_FAILURES_BEFORE_FALLBACK")
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    database_url: str = "sqlite:///./jobs.db"
+    ingest_interval_minutes: int = 30
+    max_failures_before_fallback: int = 3
+    log_level: str = "INFO"
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    # Scraping & Source Settings
+    scrape_jitter_seconds: float = 1.5
+    primary_source_url: str = "https://weworkremotely.com/categories/remote-programming-jobs"
+    fallback_rss_url: str = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

@@ -217,8 +217,8 @@
       font-weight: 500;
     }
     .tag-loc { background: rgba(188,140,255,.1); color: var(--purple); }
-    .tag-src-remotive { background: rgba(88,166,255,.1); color: var(--accent); }
-    .tag-src-arbeitnow { background: rgba(63,185,80,.1); color: var(--green); }
+    .tag-src-weworkremotely { background: rgba(88,166,255,.1); color: var(--accent); }
+    .tag-src-indeed_rss { background: rgba(63,185,80,.1); color: var(--green); }
     .tag-date { background: var(--surface2); color: var(--muted); }
 
     /* ── Sidebar ── */
@@ -335,8 +335,8 @@
     </div>
     <select id="source-filter">
       <option value="">All Sources</option>
-      <option value="remotive">Remotive</option>
-      <option value="arbeitnow">Arbeitnow</option>
+      <option value="weworkremotely">We Work Remotely (HTML)</option>
+      <option value="indeed_rss">Indeed RSS (XML)</option>
     </select>
     <button class="btn btn-primary" id="refresh-btn" onclick="loadJobs()">↻ Refresh</button>
     <button class="btn btn-ghost" id="trigger-btn" onclick="triggerIngest()">▶ Run Ingestion</button>

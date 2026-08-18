@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import List
-from app.schemas import JobCreate
+
+
+class MarkupDriftError(Exception):
+    """Raised when HTML/XML structure has changed drastically and parsing fails."""
+    pass
 
 
 class BaseSource(ABC):
@@ -10,7 +14,7 @@ class BaseSource(ABC):
 
     @abstractmethod
     async def fetch(self) -> List[dict]:
-        """Fetch raw job data from the source. Returns a list of raw dicts."""
+        """Fetch and parse raw job data from the source. Returns a list of raw dicts."""
         ...
 
     def get_name(self) -> str:

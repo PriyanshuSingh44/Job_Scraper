@@ -1,9 +1,7 @@
 import logging
-import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pathlib import Path
 
@@ -24,7 +22,7 @@ async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────
     logger.info("Starting up Job Scraper service...")
     init_db()
-    # Run initial ingestion immediately so the DB isn't empty on first visit
+    # Run initial ingestion immediately on startup
     logger.info("Running initial ingestion on startup...")
     await run_ingestion()
     start_scheduler()
@@ -37,11 +35,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Job Scraper API",
     description=(
-        "Live job ingestion pipeline pulling from Remotive (primary) and "
-        "Arbeitnow (fallback). Features retry, circuit-breaker, schema-drift "
-        "detection, and a full ingestion audit log."
+        "Live job ingestion pipeline pulling HTML from We Work Remotely (primary) and "
+        "XML RSS from Indeed (fallback). Features request pacing jitter, browser header "
+        "spoofing, 3-tier CSS selector fallback for markup drift detection, exponential "
+        "backoff retry, and an automatic circuit breaker."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -61,7 +60,7 @@ app.include_router(ingestion_log.router)
 # ── Manual trigger ────────────────────────────────────────────
 @app.post("/ingest/trigger", tags=["ingestion"])
 async def trigger_ingestion():
-    """Manually trigger a full ingestion run. Useful for demos."""
+    """Manually trigger a full ingestion run. Useful for live demo evaluation."""
     result = await run_ingestion()
     return result
 
@@ -69,10 +68,10 @@ async def trigger_ingestion():
 # ── Frontend ──────────────────────────────────────────────────
 frontend_path = Path(__file__).parent.parent / "frontend"
 
+
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def serve_frontend():
     index = frontend_path / "index.html"
     if index.exists():
         return HTMLResponse(content=index.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>Frontend not found</h1>", status_code=404)
-
