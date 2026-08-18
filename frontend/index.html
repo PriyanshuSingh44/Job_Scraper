@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JobPipeline — Live Job Board</title>
+  <meta name="description" content="Live job ingestion dashboard pulling from Remotive and Arbeitnow with resilience monitoring." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #21262d;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #58a6ff;
+      --green:     #3fb950;
+      --yellow:    #d29922;
+      --red:       #f85149;
+      --purple:    #bc8cff;
+      --radius:    10px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .logo-icon { font-size: 1.4rem; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .badge-green  { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.3); }
+    .badge-red    { background: rgba(248,81,73,.15);  color: var(--red);   border: 1px solid rgba(248,81,73,.3); }
+    .badge-yellow { background: rgba(210,153,34,.15); color: var(--yellow);border: 1px solid rgba(210,153,34,.3); }
+    .badge-blue   { background: rgba(88,166,255,.15); color: var(--accent);border: 1px solid rgba(88,166,255,.3); }
+
+    /* ── Layout ── */
+    .container { max-width: 1280px; margin: 0 auto; padding: 2rem; }
+
+    /* ── Stats row ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      transition: border-color .2s, transform .2s;
+    }
+    .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .stat-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: .5rem; }
+    .stat-value { font-size: 2rem; font-weight: 700; color: var(--text); }
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.green  { color: var(--green); }
+    .stat-value.red    { color: var(--red); }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 220px;
+    }
+    .search-wrap input {
+      width: 100%;
+      padding: .6rem 1rem .6rem 2.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: .875rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-icon {
+      position: absolute;
+      left: .75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: .85rem;
+      pointer-events: none;
+    }
+    select {
+      padding: .6rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: .875rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color .2s;
+    }
+    select:focus { border-color: var(--accent); }
+    .btn {
+      padding: .6rem 1.25rem;
+      border-radius: var(--radius);
+      border: none;
+      font-family: inherit;
+      font-size: .875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .btn-primary { background: var(--accent); color: #0d1117; }
+    .btn-primary:hover { background: #79b8ff; }
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn.loading::after {
+      content: '';
+      width: 12px; height: 12px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    /* ── Two-column layout ── */
+    .main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; }
+    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+    /* ── Job list ── */
+    .section-title {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .job-list { display: flex; flex-direction: column; gap: .75rem; }
+    .job-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      transition: border-color .2s, transform .15s;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+      position: relative;
+      overflow: hidden;
+    }
+    .job-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--accent);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .job-card:hover { border-color: var(--accent); transform: translateX(3px); }
+    .job-card:hover::before { opacity: 1; }
+    .job-title { font-weight: 600; font-size: .95rem; margin-bottom: .3rem; color: var(--text); }
+    .job-company { font-size: .85rem; color: var(--accent); margin-bottom: .5rem; }
+    .job-meta { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .tag {
+      font-size: .7rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .tag-loc { background: rgba(188,140,255,.1); color: var(--purple); }
+    .tag-src-remotive { background: rgba(88,166,255,.1); color: var(--accent); }
+    .tag-src-arbeitnow { background: rgba(63,185,80,.1); color: var(--green); }
+    .tag-date { background: var(--surface2); color: var(--muted); }
+
+    /* ── Sidebar ── */
+    .sidebar { display: flex; flex-direction: column; gap: 1.25rem; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+    }
+    .panel-title {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+    }
+    .log-list { display: flex; flex-direction: column; gap: .6rem; }
+    .log-entry {
+      padding: .6rem .75rem;
+      border-radius: 6px;
+      background: var(--surface2);
+      border-left: 3px solid var(--border);
+      font-size: .78rem;
+    }
+    .log-entry.success     { border-left-color: var(--green); }
+    .log-entry.failed      { border-left-color: var(--red); }
+    .log-entry.schema_drift{ border-left-color: var(--yellow); }
+    .log-entry.empty_response { border-left-color: var(--red); }
+    .log-entry.fallback_success { border-left-color: var(--purple); }
+    .log-status { font-weight: 600; margin-bottom: .2rem; }
+    .log-status.success      { color: var(--green); }
+    .log-status.failed       { color: var(--red); }
+    .log-status.schema_drift { color: var(--yellow); }
+    .log-status.empty_response { color: var(--red); }
+    .log-status.fallback_success { color: var(--purple); }
+    .log-detail { color: var(--muted); line-height: 1.4; }
+
+    /* ── Empty / loading states ── */
+    .empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+
+    /* ── Konami easter egg overlay ── */
+    #egg-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.85);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
+    #egg-overlay.show { display: flex; animation: fadeIn .3s; }
+    .egg-content { max-width: 420px; padding: 2rem; }
+    .egg-emoji { font-size: 4rem; display: block; margin-bottom: 1rem; }
+    .egg-title { font-size: 1.5rem; font-weight: 700; color: var(--accent); margin-bottom: .5rem; }
+    .egg-text { color: var(--muted); line-height: 1.6; }
+    .egg-close { margin-top: 1.5rem; }
+
+    /* ── Animations ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .job-card { animation: slideUp .3s ease both; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: .78rem;
+      margin-top: 3rem;
+      cursor: default;
+    }
+    footer:hover .footer-hint { opacity: 1; }
+    .footer-hint { opacity: 0; transition: opacity .3s; color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <a class="logo" href="/">
+    <span class="logo-icon">⚡</span>
+    JobPipeline
+  </a>
+  <div class="header-actions">
+    <span id="health-badge" class="badge badge-yellow">Checking...</span>
+    <a href="/docs" class="btn btn-ghost" style="font-size:.78rem;padding:.4rem .85rem;">API Docs</a>
+  </div>
+</header>
+
+<!-- ── Main ── -->
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Jobs</div>
+      <div class="stat-value accent" id="stat-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Source</div>
+      <div class="stat-value" id="stat-source" style="font-size:1.2rem;">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Status</div>
+      <div class="stat-value" id="stat-status" style="font-size:1.2rem;">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Run</div>
+      <div class="stat-value" id="stat-time" style="font-size:1rem;padding-top:.5rem;">—</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Search title or company…" />
+    </div>
+    <select id="source-filter">
+      <option value="">All Sources</option>
+      <option value="remotive">Remotive</option>
+      <option value="arbeitnow">Arbeitnow</option>
+    </select>
+    <button class="btn btn-primary" id="refresh-btn" onclick="loadJobs()">↻ Refresh</button>
+    <button class="btn btn-ghost" id="trigger-btn" onclick="triggerIngest()">▶ Run Ingestion</button>
+  </div>
+
+  <!-- Two-column layout -->
+  <div class="main-grid">
+
+    <!-- Job list -->
+    <div>
+      <div class="section-title">
+        <span>Jobs <span id="job-count" style="color:var(--accent)"></span></span>
+      </div>
+      <div class="job-list" id="job-list">
+        <div class="empty"><div class="empty-icon">⏳</div>Loading jobs…</div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-title">Pipeline Log</div>
+        <div class="log-list" id="log-list">
+          <div class="empty">Loading…</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Circuit Breaker</div>
+        <div id="circuit-status" style="font-size:.85rem;line-height:1.6;color:var(--muted);">
+          Checking…
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <span>JobPipeline © 2024 — Built with FastAPI + SQLite</span>
+  <span class="footer-hint">↑ ↑ ↓ ↓ ← → ← → B A — try it 👀</span>
+</footer>
+
+<!-- Easter Egg Overlay -->
+<div id="egg-overlay">
+  <div class="egg-content">
+    <span class="egg-emoji">🥚</span>
+    <div class="egg-title">You found it!</div>
+    <p class="egg-text">
+      Konami Code activated. You clearly read the source code — or you just mashed keys.<br><br>
+      Either way, the pipeline respects your curiosity.<br>
+      <code style="color:var(--accent)">GET /secret</code> for the API version.
+    </p>
+    <button class="btn btn-primary egg-close" onclick="closeEgg()">Close ✕</button>
+  </div>
+</div>
+
+<script>
+  const API = '';  // Same origin
+
+  // ── Data loading ──────────────────────────────────────────
+  async function loadHealth() {
+    try {
+      const r = await fetch(`${API}/health`);
+      const d = await r.json();
+
+      const badge = document.getElementById('health-badge');
+      badge.textContent = d.status === 'ok' ? '● Live' : '⚠ Degraded';
+      badge.className = `badge ${d.status === 'ok' ? 'badge-green' : 'badge-red'}`;
+
+      document.getElementById('stat-total').textContent = d.total_jobs.toLocaleString();
+
+      if (d.last_ingestion) {
+        const li = d.last_ingestion;
+        document.getElementById('stat-source').textContent = li.source;
+        document.getElementById('stat-status').textContent = li.status;
+        document.getElementById('stat-status').style.color =
+          li.status === 'success' ? 'var(--green)' : li.status.includes('drift') ? 'var(--yellow)' : 'var(--red)';
+        document.getElementById('stat-time').textContent = fmtTime(li.timestamp);
+      }
+
+      // Circuit breaker panel
+      document.getElementById('circuit-status').innerHTML =
+        `State: <strong style="color:${d.status === 'ok' ? 'var(--green)' : 'var(--red)'}">
+          ${d.status === 'ok' ? 'CLOSED ✓ (healthy)' : 'OPEN ✗ (using fallback)'}
+        </strong><br>
+        Total jobs indexed: <strong style="color:var(--accent)">${d.total_jobs}</strong>`;
+    } catch(e) { console.error('Health check failed', e); }
+  }
+
+  async function loadJobs() {
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true; btn.classList.add('loading');
+
+    const q = document.getElementById('search-input').value;
+    const src = document.getElementById('source-filter').value;
+    let url = `${API}/jobs?limit=100`;
+    if (q) url += `&q=${encodeURIComponent(q)}`;
+    if (src) url += `&source=${src}`;
+
+    try {
+      const r = await fetch(url);
+      const jobs = await r.json();
+      renderJobs(jobs);
+    } catch(e) {
+      document.getElementById('job-list').innerHTML =
+        '<div class="empty"><div class="empty-icon">❌</div>Failed to load jobs.</div>';
+    } finally {
+      btn.disabled = false; btn.classList.remove('loading');
+    }
+  }
+
+  function renderJobs(jobs) {
+    const el = document.getElementById('job-list');
+    document.getElementById('job-count').textContent = `(${jobs.length})`;
+
+    if (!jobs.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div>No jobs found. Try a different filter or trigger ingestion.</div>';
+      return;
+    }
+
+    el.innerHTML = jobs.map((j, i) => `
+      <a href="${escHtml(j.url)}" target="_blank" rel="noopener" class="job-card" style="animation-delay:${i * 0.03}s">
+        <div class="job-title">${escHtml(j.title)}</div>
+        <div class="job-company">${escHtml(j.company)}</div>
+        <div class="job-meta">
+          ${j.location ? `<span class="tag tag-loc">📍 ${escHtml(j.location)}</span>` : ''}
+          <span class="tag tag-src-${j.source}">${j.source}</span>
+          ${j.posted_date ? `<span class="tag tag-date">${fmtDate(j.posted_date)}</span>` : ''}
+        </div>
+      </a>
+    `).join('');
+  }
+
+  async function loadLog() {
+    try {
+      const r = await fetch(`${API}/ingestion-log?limit=15`);
+      const logs = await r.json();
+      renderLog(logs);
+    } catch(e) { console.error('Log load failed', e); }
+  }
+
+  function renderLog(logs) {
+    const el = document.getElementById('log-list');
+    if (!logs.length) { el.innerHTML = '<div class="empty">No runs yet.</div>'; return; }
+
+    el.innerHTML = logs.map(l => `
+      <div class="log-entry ${l.status}">
+        <div class="log-status ${l.status}">${statusIcon(l.status)} ${l.status}</div>
+        <div class="log-detail">
+          ${l.source} · ${l.records_pulled} records<br>
+          ${fmtTime(l.timestamp)}
+          ${l.error_message ? `<br><span style="color:var(--red);font-size:.7rem">${escHtml(l.error_message.slice(0,80))}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function triggerIngest() {
+    const btn = document.getElementById('trigger-btn');
+    btn.disabled = true; btn.classList.add('loading'); btn.textContent = ' Running…';
+
+    try {
+      const r = await fetch(`${API}/ingest/trigger`, { method: 'POST' });
+      const d = await r.json();
+      await Promise.all([loadHealth(), loadJobs(), loadLog()]);
+      btn.textContent = '✓ Done';
+      setTimeout(() => { btn.textContent = '▶ Run Ingestion'; }, 2000);
+    } catch(e) {
+      btn.textContent = '✗ Failed';
+      setTimeout(() => { btn.textContent = '▶ Run Ingestion'; }, 2000);
+    } finally {
+      btn.disabled = false; btn.classList.remove('loading');
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
+    return d.toLocaleString();
+  }
+  function fmtDate(s) {
+    if (!s) return '';
+    try { return new Date(s).toLocaleDateString(); } catch { return s; }
+  }
+  function statusIcon(s) {
+    return { success:'✓', failed:'✗', schema_drift:'⚠', empty_response:'○', fallback_success:'↻' }[s] || '?';
+  }
+
+  // ── Search debounce ───────────────────────────────────────
+  let searchTimer;
+  document.getElementById('search-input').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadJobs, 350);
+  });
+  document.getElementById('source-filter').addEventListener('change', loadJobs);
+
+  // ── Konami Code easter egg ────────────────────────────────
+  const KONAMI = [38,38,40,40,37,39,37,39,66,65];
+  let konamiPos = 0;
+  document.addEventListener('keydown', e => {
+    if (e.keyCode === KONAMI[konamiPos]) {
+      konamiPos++;
+      if (konamiPos === KONAMI.length) {
+        konamiPos = 0;
+        document.getElementById('egg-overlay').classList.add('show');
+      }
+    } else {
+      konamiPos = 0;
+    }
+  });
+  function closeEgg() { document.getElementById('egg-overlay').classList.remove('show'); }
+
+  // ── Auto-refresh every 60s ────────────────────────────────
+  setInterval(() => { loadHealth(); loadJobs(); loadLog(); }, 60000);
+
+  // ── Init ─────────────────────────────────────────────────
+  loadHealth();
+  loadJobs();
+  loadLog();
+</script>
+</body>
+</html>

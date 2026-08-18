@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: job-scraper
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./jobs.db
+      - key: INGEST_INTERVAL_MINUTES
+        value: "30"
+      - key: MAX_FAILURES_BEFORE_FALLBACK
+        value: "3"
+      - key: LOG_LEVEL
+        value: INFO
+    disk:
+      name: jobs-db
+      mountPath: /opt/render/project/src
+      sizeGB: 1
