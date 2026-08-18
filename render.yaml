@@ -16,7 +16,3 @@ services:
         value: INFO
       - key: PYTHON_VERSION
         value: 3.11.9
-    disk:
-      name: jobs-db
-      mountPath: /opt/render/project/src
-      sizeGB: 1
