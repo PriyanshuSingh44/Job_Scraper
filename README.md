@@ -65,7 +65,6 @@ Open `http://localhost:8000` for the dashboard, `http://localhost:8000/docs` for
 | `GET` | `/health` | Service health + last ingestion |
 | `GET` | `/ingestion-log` | Full pipeline audit log |
 | `POST` | `/ingest/trigger` | Manually trigger ingestion |
-| `GET` | `/secret` | 🥚 Easter egg |
 | `GET` | `/docs` | Swagger UI |
 
 ## Resilience Demo

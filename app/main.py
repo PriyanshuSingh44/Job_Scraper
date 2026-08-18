@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from pathlib import Path
 
 from app.database import init_db
@@ -76,12 +76,3 @@ async def serve_frontend():
         return HTMLResponse(content=index.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>Frontend not found</h1>", status_code=404)
 
-
-# ── Easter egg ────────────────────────────────────────────────
-@app.get("/secret", tags=["easter-egg"])
-async def secret():
-    return JSONResponse({
-        "message": "🥚 You found the easter egg!",
-        "hint": "Try the Konami code on the dashboard: ↑ ↑ ↓ ↓ ← → ← → B A",
-        "reward": "You clearly read the code. That counts for something.",
-    })
