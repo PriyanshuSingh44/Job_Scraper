@@ -49,3 +49,26 @@ def test_parse_indeed_rss_empty_xml_raises_markup_drift():
 
     with pytest.raises(MarkupDriftError, match="0 feed entries"):
         source.parse_xml(empty_xml)
+
+
+def test_parse_wwr_xml_content():
+    source = WeWorkRemotelySource()
+    xml_content = """<?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0">
+      <channel>
+        <title>We Work Remotely</title>
+        <item>
+          <title>Stripe: Senior Backend Engineer</title>
+          <link>https://weworkremotely.com/remote-jobs/stripe-senior-backend-engineer</link>
+          <region>Anywhere in the World</region>
+          <pubDate>Wed, 22 Jul 2026 07:00:00 +0000</pubDate>
+        </item>
+      </channel>
+    </rss>"""
+
+    jobs = source.parse_html(xml_content)
+    assert len(jobs) == 1
+    assert jobs[0]["title"] == "Senior Backend Engineer"
+    assert jobs[0]["company_name"] == "Stripe"
+    assert jobs[0]["url"] == "https://weworkremotely.com/remote-jobs/stripe-senior-backend-engineer"
+

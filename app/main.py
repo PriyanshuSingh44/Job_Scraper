@@ -57,11 +57,15 @@ app.include_router(health.router)
 app.include_router(ingestion_log.router)
 
 
+from typing import Optional
+from fastapi import Query
+
+
 # ── Manual trigger ────────────────────────────────────────────
 @app.post("/ingest/trigger", tags=["ingestion"])
-async def trigger_ingestion():
-    """Manually trigger a full ingestion run. Useful for live demo evaluation."""
-    result = await run_ingestion()
+async def trigger_ingestion(source: Optional[str] = Query(None, description="Specific source to ingest: 'weworkremotely' or 'indeed_rss'")):
+    """Manually trigger a full ingestion run for all or a specific source."""
+    result = await run_ingestion(target_source=source)
     return result
 
 

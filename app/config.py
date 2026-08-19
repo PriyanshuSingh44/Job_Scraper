@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     # Scraping & Source Settings
     scrape_jitter_seconds: float = 1.5
-    primary_source_url: str = "https://weworkremotely.com/categories/remote-programming-jobs"
+    primary_source_url: str = "https://weworkremotely.com/categories/remote-full-stack-programming-jobs"
     fallback_rss_url: str = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

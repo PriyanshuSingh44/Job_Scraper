@@ -96,24 +96,38 @@ def _write_log(
     logger.info(f"[pipeline] Log written: source={source} status={status} records={records_pulled}")
 
 
-async def run_ingestion() -> dict:
+async def run_ingestion(target_source: str = None) -> dict:
     """
     Main pipeline entry point. Called by scheduler and the /ingest/trigger endpoint.
+    Supports targeting a specific source ("weworkremotely" or "indeed_rss"),
+    or defaults to automatic selection via Circuit Breaker.
     Returns a summary dict for API responses.
     """
     db: Session = SessionLocal()
     used_fallback = False
 
     try:
-        # Step 1: Decide source based on Circuit Breaker
-        if circuit_breaker.should_use_fallback:
-            logger.warning("[pipeline] Circuit breaker OPEN — using fallback RSS source (Indeed RSS).")
+        # Step 1: Decide source
+        if target_source == "indeed_rss":
+            logger.info("[pipeline] Explicit source targeted: Indeed RSS XML.")
             active_source = fallback_source
             normalizer = normalize_indeed_rss
             used_fallback = True
-        else:
+        elif target_source == "weworkremotely":
+            logger.info("[pipeline] Explicit source targeted: WeWorkRemotely HTML.")
             active_source = primary_source
             normalizer = normalize_wwr
+            used_fallback = False
+        else:
+            # Auto circuit breaker decision
+            if circuit_breaker.should_use_fallback:
+                logger.warning("[pipeline] Circuit breaker OPEN — using fallback RSS source (Indeed RSS).")
+                active_source = fallback_source
+                normalizer = normalize_indeed_rss
+                used_fallback = True
+            else:
+                active_source = primary_source
+                normalizer = normalize_wwr
 
         source_name = active_source.get_name()
 

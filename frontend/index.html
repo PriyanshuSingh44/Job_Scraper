@@ -168,8 +168,8 @@
     }
 
     /* ── Two-column layout ── */
-    .main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; }
-    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+    .main-grid { display: grid; grid-template-columns: 1fr 480px; gap: 1.5rem; }
+    @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
 
     /* ── Job list ── */
     .section-title {
@@ -230,33 +230,61 @@
       padding: 1.25rem;
     }
     .panel-title {
-      font-size: .8rem;
+      font-size: .85rem;
       font-weight: 600;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 1px;
       margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    .log-list { display: flex; flex-direction: column; gap: .6rem; }
+    .log-list {
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+      max-height: 560px;
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+    .log-list::-webkit-scrollbar { width: 6px; }
+    .log-list::-webkit-scrollbar-track { background: var(--surface); }
+    .log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .log-list::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     .log-entry {
-      padding: .6rem .75rem;
-      border-radius: 6px;
+      padding: .85rem 1rem;
+      border-radius: 8px;
       background: var(--surface2);
-      border-left: 3px solid var(--border);
-      font-size: .78rem;
+      border-left: 4px solid var(--border);
+      font-size: .85rem;
+      transition: background .2s;
     }
+    .log-entry:hover { background: #282e36; }
     .log-entry.success     { border-left-color: var(--green); }
     .log-entry.failed      { border-left-color: var(--red); }
     .log-entry.schema_drift{ border-left-color: var(--yellow); }
     .log-entry.empty_response { border-left-color: var(--red); }
     .log-entry.fallback_success { border-left-color: var(--purple); }
-    .log-status { font-weight: 600; margin-bottom: .2rem; }
+    .log-status { font-weight: 600; font-size: .9rem; margin-bottom: .3rem; display: flex; justify-content: space-between; }
     .log-status.success      { color: var(--green); }
     .log-status.failed       { color: var(--red); }
     .log-status.schema_drift { color: var(--yellow); }
     .log-status.empty_response { color: var(--red); }
     .log-status.fallback_success { color: var(--purple); }
-    .log-detail { color: var(--muted); line-height: 1.4; }
+    .log-detail { color: var(--text); line-height: 1.5; font-size: .82rem; }
+    .log-error-box {
+      color: var(--red);
+      font-size: .78rem;
+      font-family: monospace;
+      margin-top: 6px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: rgba(248,81,73,.1);
+      border: 1px solid rgba(248,81,73,.2);
+      padding: 8px 10px;
+      border-radius: 6px;
+    }
 
     /* ── Empty / loading states ── */
     .empty {
@@ -339,7 +367,14 @@
       <option value="indeed_rss">Indeed RSS (XML)</option>
     </select>
     <button class="btn btn-primary" id="refresh-btn" onclick="loadJobs()">↻ Refresh</button>
-    <button class="btn btn-ghost" id="trigger-btn" onclick="triggerIngest()">▶ Run Ingestion</button>
+    <div style="display:flex;gap:.5rem;align-items:center;">
+      <select id="ingest-target-select" style="border-color:var(--accent);background:var(--surface2);font-weight:500;">
+        <option value="">Ingest Target: Auto (Circuit Breaker)</option>
+        <option value="weworkremotely">Ingest Target: WeWorkRemotely (HTML)</option>
+        <option value="indeed_rss">Ingest Target: Indeed RSS (XML)</option>
+      </select>
+      <button class="btn btn-primary" id="trigger-btn" onclick="triggerIngest()" style="background:var(--green);color:#0d1117;font-weight:600;">▶ Run Ingestion</button>
+    </div>
   </div>
 
   <!-- Two-column layout -->
@@ -459,7 +494,7 @@
 
   async function loadLog() {
     try {
-      const r = await fetch(`${API}/ingestion-log?limit=15`);
+      const r = await fetch(`${API}/ingestion-log?limit=50`);
       const logs = await r.json();
       renderLog(logs);
     } catch(e) { console.error('Log load failed', e); }
@@ -471,11 +506,13 @@
 
     el.innerHTML = logs.map(l => `
       <div class="log-entry ${l.status}">
-        <div class="log-status ${l.status}">${statusIcon(l.status)} ${l.status}</div>
+        <div class="log-status ${l.status}">
+          <span>${statusIcon(l.status)} ${l.status}</span>
+          <span style="font-size:.75rem;color:var(--muted);font-weight:400;">${l.source}</span>
+        </div>
         <div class="log-detail">
-          ${l.source} · ${l.records_pulled} records<br>
-          ${fmtTime(l.timestamp)}
-          ${l.error_message ? `<br><span style="color:var(--red);font-size:.7rem">${escHtml(l.error_message.slice(0,80))}</span>` : ''}
+          <strong>${l.records_pulled}</strong> records ingested · <span style="color:var(--muted);">${fmtTime(l.timestamp)}</span>
+          ${l.error_message ? `<div class="log-error-box">${escHtml(l.error_message)}</div>` : ''}
         </div>
       </div>
     `).join('');
@@ -483,10 +520,15 @@
 
   async function triggerIngest() {
     const btn = document.getElementById('trigger-btn');
+    const targetSource = document.getElementById('ingest-target-select').value;
     btn.disabled = true; btn.classList.add('loading'); btn.textContent = ' Running…';
 
     try {
-      const r = await fetch(`${API}/ingest/trigger`, { method: 'POST' });
+      let url = `${API}/ingest/trigger`;
+      if (targetSource) {
+        url += `?source=${encodeURIComponent(targetSource)}`;
+      }
+      const r = await fetch(url, { method: 'POST' });
       const d = await r.json();
       await Promise.all([loadHealth(), loadJobs(), loadLog()]);
       btn.textContent = '✓ Done';
